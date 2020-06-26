@@ -6,7 +6,7 @@ import js.Syntax.code as __js;
 class Runtime {
   static var last = '';
   static public function patch(source:String) {
-    if (source == null || source == last) return;
+    if (source == null || source == '' || source == last) return;
     __js('var hxPatch = {0}', Runtime);
     trace([source.length, last.length]);
     js.Lib.eval(source);
@@ -19,6 +19,10 @@ class Runtime {
     if (!isFirst)
       __js('hxPatch.next = {0}', Runtime);
     isFirst;
+  }
+
+  static function boot() {
+
   }
 
   static function getClasses(node:Node) {

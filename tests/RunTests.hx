@@ -7,8 +7,7 @@ class RunTests {
 
   static function main()
     if (Runtime.FIRST_LOAD) {
-      var file = js.Node.__filename,
-          last = null;
+      var file = js.Node.__filename;
       watch(file, (a, b) -> {
         trace('change triggered');
         try Runtime.patch(readFileSync(file).toString())
