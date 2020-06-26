@@ -1,10 +1,22 @@
 package ;
 
+import hotswap.Runtime;
+import js.node.Fs.*;
+
 class RunTests {
 
-  static function main() {
-    travix.Logger.println('it works');
-    travix.Logger.exit(0); // make sure we exit properly, which is necessary on some targets, e.g. flash & (phantom)js
-  }
+  static function main()
+    if (Runtime.FIRST_LOAD) {
+      var file = js.Node.__filename,
+          last = null;
+      watch(file, (a, b) -> {
+        trace('change triggered');
+        try Runtime.patch(readFileSync(file).toString())
+        catch (e:Dynamic) {}
+      });
+    }
 
+  @:keep static function onHotSwapLoad(isNew:Bool) {
+    trace('loaded ($isNew)');
+  }
 }

@@ -1,1 +1,2 @@
 --macro hotswap.Macro.use()
+-D js-unflatten

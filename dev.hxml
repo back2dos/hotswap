@@ -1,4 +1,5 @@
 -lib hotswap
 tests.hxml
 -lib travix
+-lib hxnodejs
 -js bin/out.js
