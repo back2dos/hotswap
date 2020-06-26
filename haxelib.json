@@ -1,0 +1,17 @@
+{
+  "name": "hotswap",
+  "license": "MIT",
+  "tags": [
+    "js",
+    "hmr",
+    "hot-reload"
+  ],
+  "classPath": "src",
+  "contributors": [
+    "back2dos"
+  ],
+  "releasenote": "initial release",
+  "version": "0.0.0",
+  "url": "https://github.com/back2dos/hotswap/",
+  "dependencies": {}
+}
