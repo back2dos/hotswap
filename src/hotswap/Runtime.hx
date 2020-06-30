@@ -1,19 +1,21 @@
 package hotswap;
 
 import haxe.ds.Option;
+import haxe.DynamicAccess as Dict;
 import js.Syntax.code as __js;
 
 class Runtime {
   static var last = '';
+
   static public function patch(source:String) {
     if (source == null || source == '' || source == last) return;
-    var old = __js('hx'),
-        statics = statics;
+    var old = getRoot();
     __js('var hxPatch = null');
     js.Lib.eval(source);
-    doPatch(old, statics);
+    doPatch(old);
     last = source;
   }
+
   static public final FIRST_LOAD = {
     var isFirst:Bool = __js('typeof hxPatch === "undefined"');
     trace('load: $isFirst');
@@ -22,22 +24,31 @@ class Runtime {
     isFirst;
   }
 
-  static function boot() {
-    final root:Node = __js('hx');
-    root.crawl(bootClass);
-    root.crawl(c -> if (c.onHotswapLoad != null) c.onHotswapLoad(true));
-  }
+  static function boot()
+    getRoot().crawl(c -> bootClass(c));
 
-  static var statics = new Statics();
+  static function getRoot():Node
+    return __js('hx');
 
-  static function bootClass(c:Dynamic) {
-    var initial:haxe.DynamicAccess<Dynamic> = Reflect.copy(c);
-    initial.remove('prototype');
-    statics[Type.getClassName(c)] = initial;
+  static function bootClass(c:Dynamic, ?old:Dynamic)
+    if (c.onHotswapLoad != null)
+      c.onHotswapLoad(old == null);
+
+  static function getStatics(c:Dynamic):Dict<Void>
+    return
+      if (c == null) {}
+      else cast haxe.rtti.Meta.getStatics(c);
+
+  static function updateStatics(c:Dynamic, ?old:Dynamic) {
+    var isOld = getStatics(old).exists;
+
+    for (f in getStatics(c).keys())
+      if (isOld(f))
+        Reflect.setField(c, f, Reflect.field(old, f));
   }
 
   static function getClasses(node:Node) {
-    var ret = new haxe.DynamicAccess<Dynamic>();
+    var ret = new Dict<Dynamic>();
 
     node.crawl(c -> switch Type.getClassName(c) {
       case null:
@@ -46,42 +57,21 @@ class Runtime {
 
     return ret;
   }
-  static function doPatch(oldRoot:Package, statics:Statics) {
-    var newRoot:Package = __js('hx');
+
+  static function doPatch(oldRoot:Node) {
 
     var oldClasses = getClasses(oldRoot),
-        newClasses = getClasses(newRoot);
+        newClasses = getClasses(getRoot());
 
     for (k => v in oldClasses)
       if (v.onHotswapUnload)
         v.onHotswapUnload(newClasses.exists(k));
 
-    for (k => v in newRoot)
-      oldRoot[k] = v;
+    for (n => c in newClasses)
+      updateStatics(c, oldClasses[n]);
 
-    for (old in [for (k => v in oldRoot) if (!newRoot.exists(k)) k])
-      oldRoot.remove(old);
-
-    for (k => v in newClasses) {
-      switch oldClasses[k] {
-        case null: trace('is new: $k');
-        case old:
-          for (f => initial in statics[k])
-            switch Reflect.field(old, f) {
-              case _ == initial => true:
-              case changed:
-                trace('changed: $k.$f');
-                Reflect.setField(v, f, changed);
-            }
-      }
-      bootClass(v);
-    }
-
-
-    for (k => v in newClasses)
-      if (v.onHotswapLoad)
-        v.onHotswapLoad(!oldClasses.exists(k));
-
+    for (n => c in newClasses)
+      bootClass(c, oldClasses[n]);
   }
 }
 
@@ -113,6 +103,4 @@ private enum NodeKind {
   Pack(p:Package);
 }
 
-private typedef Package = haxe.DynamicAccess<Node>;
-
-private typedef Statics = haxe.DynamicAccess<haxe.DynamicAccess<Dynamic>>;
+private typedef Package = Dict<Node>;
