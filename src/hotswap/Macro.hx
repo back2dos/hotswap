@@ -7,6 +7,7 @@ import haxe.macro.Expr;
 import haxe.macro.Type;
 
 using tink.MacroApi;
+using StringTools;
 
 class Macro {
 
@@ -30,6 +31,25 @@ class Macro {
     return ret;
   }
 
+  static function move(t:BaseType)
+    if (!t.isExtern) {
+      t.meta.remove(':native');
+
+      var id = {
+        var a = ["hx"].concat(t.pack);
+        if (t.isPrivate)
+          a.push('$');
+        a.push(t.name);
+        macro $v{a.join('.')};
+      }
+
+      t.meta.add(':native', [id], id.pos);
+    }
+
+  static function keep(o:{ meta:MetaAccess })
+    if (!o.meta.has(':keep'))
+      o.meta.add(':keep', [], (macro null).pos);
+
   static function use() {
     switch MacroApi.getMainClass() {
       case None: (macro null).pos.error('no entry point');
@@ -38,20 +58,15 @@ class Macro {
     onGenerate(types -> {
       for (t in types)
         switch t {
-          case TEnum(base(_) => t, _)
-             | TInst(base(_) => t, _) if (!t.isExtern):
-
-            t.meta.remove(':native');
-
-            var id = {
-              var a = ["hx"].concat(t.pack);
-              if (t.isPrivate)
-                a.push('$');
-              a.push(t.name);
-              macro $v{a.join('.')};
-            }
-
-            t.meta.add(':native', [id], id.pos);
+          case TEnum(_.get() => e, _): move(e);
+          case TInst(_.get() => c, _): move(c);
+            for (f in c.statics.get())
+              switch f.kind {
+                case FVar(_, AccNormal):
+                  f.meta.add('hotreload.persist', [], (macro null).pos);
+                default:
+                  if (f.name.startsWith('onHotswap')) keep(f);
+              }
 
           default:
         }

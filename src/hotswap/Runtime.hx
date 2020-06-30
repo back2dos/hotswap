@@ -8,9 +8,8 @@ class Runtime {
   static public function patch(source:String) {
     if (source == null || source == '' || source == last) return;
     __js('var hxPatch = {0}', Runtime);
-    trace([source.length, last.length]);
     js.Lib.eval(source);
-    next.doPatch(__js('hx'));
+    next.doPatch(__js('hx'), statics);
     last = source;
   }
   static var next = Runtime;
@@ -22,7 +21,18 @@ class Runtime {
   }
 
   static function boot() {
+    var root:Node = __js('hx');
+    root.crawl(bootClass);
+    root.crawl(c -> if (c.onHotswapLoad != null) c.onHotswapLoad(true));
 
+  }
+
+  static var statics = new Statics();
+
+  static function bootClass(c:Dynamic) {
+    var initial:haxe.DynamicAccess<Dynamic> = Reflect.copy(c);
+    initial.remove('prototype');
+    statics[Type.getClassName(c)] = initial;
   }
 
   static function getClasses(node:Node) {
@@ -35,15 +45,15 @@ class Runtime {
 
     return ret;
   }
-  static function doPatch(oldRoot:Package) {
-    var newRoot:Package = untyped hx;
+  static function doPatch(oldRoot:Package, statics:Statics) {
+    var newRoot:Package = __js('hx');
 
     var oldClasses = getClasses(oldRoot),
         newClasses = getClasses(newRoot);
 
     for (k => v in oldClasses)
-      if (v.onHotSwapUnload)
-        v.onHotSwapUnload(newClasses.exists(k));
+      if (v.onHotswapUnload)
+        v.onHotswapUnload(newClasses.exists(k));
 
     for (k => v in newRoot)
       oldRoot[k] = v;
@@ -51,9 +61,25 @@ class Runtime {
     for (old in [for (k => v in oldRoot) if (!newRoot.exists(k)) k])
       oldRoot.remove(old);
 
+    for (k => v in newClasses) {
+      switch oldClasses[k] {
+        case null: trace('is new: $k');
+        case old:
+          for (f => initial in statics[k])
+            switch Reflect.field(old, f) {
+              case _ == initial => true:
+              case changed:
+                trace('changed: $k.$f');
+                Reflect.setField(v, f, changed);
+            }
+      }
+      bootClass(v);
+    }
+
+
     for (k => v in newClasses)
-      if (v.onHotSwapLoad)
-        v.onHotSwapLoad(oldClasses.exists(k));
+      if (v.onHotswapLoad)
+        v.onHotswapLoad(!oldClasses.exists(k));
 
   }
 }
@@ -87,3 +113,5 @@ private enum NodeKind {
 }
 
 private typedef Package = haxe.DynamicAccess<Node>;
+
+private typedef Statics = haxe.DynamicAccess<haxe.DynamicAccess<Dynamic>>;
