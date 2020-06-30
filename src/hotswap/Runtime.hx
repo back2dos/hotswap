@@ -7,24 +7,25 @@ class Runtime {
   static var last = '';
   static public function patch(source:String) {
     if (source == null || source == '' || source == last) return;
-    __js('var hxPatch = {0}', Runtime);
+    var old = __js('hx'),
+        statics = statics;
+    __js('var hxPatch = null');
     js.Lib.eval(source);
-    next.doPatch(__js('hx'), statics);
+    doPatch(old, statics);
     last = source;
   }
-  static var next = Runtime;
   static public final FIRST_LOAD = {
-    var isFirst = __js('typeof hxPatch === "undefined"');
+    var isFirst:Bool = __js('typeof hxPatch === "undefined"');
+    trace('load: $isFirst');
     if (!isFirst)
-      __js('hxPatch.next = {0}', Runtime);
+      __js('hxPatch = hx');
     isFirst;
   }
 
   static function boot() {
-    var root:Node = __js('hx');
+    final root:Node = __js('hx');
     root.crawl(bootClass);
     root.crawl(c -> if (c.onHotswapLoad != null) c.onHotswapLoad(true));
-
   }
 
   static var statics = new Statics();
