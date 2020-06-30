@@ -62,7 +62,7 @@ class Macro {
           case TInst(_.get() => c, _): move(c);
             for (f in c.statics.get())
               switch f.kind {
-                case FVar(_, AccNormal):
+                case FVar(_, AccNormal) | FMethod(MethDynamic):
                   f.meta.add('hotreload.persist', [], (macro null).pos);
                 default:
                   if (f.name.startsWith('onHotswap')) keep(f);
