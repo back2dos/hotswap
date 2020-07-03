@@ -66,9 +66,18 @@ class Macro {
     return ret;
   }
 
+  static function skip(t:BaseType)
+    return switch t {
+      case { isExtern: true, }: true;
+      case { pack: ['haxe', 'iterators'], name: 'ArrayIterator' }
+         | { module: 'haxe.Exception'}: //TODO: exceptions need to be treated properly
+        true;
+      default: t.meta.has(':coreType');
+    }
+
   static function move(t:BaseType)
     return
-      if (!t.isExtern && t.module != 'haxe.Exception') {//TODO: this needs to be solved properly
+      if (!skip(t)) {
         t.meta.remove(':native');
 
         var id = getId(t);
