@@ -24,8 +24,10 @@ class Runtime {
     isFirst;
   }
 
-  static function boot()
+  static function boot() {
+    getRoot().crawl(c -> bootProto(c));
     getRoot().crawl(c -> bootClass(c));
+  }
 
   static function getRoot():Node
     return __js('hx');
@@ -34,10 +36,15 @@ class Runtime {
     if (c.onHotswapLoad != null)
       c.onHotswapLoad(old == null);
 
-  static function getStatics(c:Dynamic):Dict<Void>
-    return
-      if (c == null) {}
-      else cast haxe.rtti.Meta.getStatics(c);
+  static function getStatics(c:Dynamic)
+    return meta(if (c == null) {} else haxe.rtti.Meta.getStatics(c), 'hotreload.persist');
+
+  static function meta(meta:Dynamic<Dynamic<Array<Dynamic>>>, name) {
+    var ret = new Dict<Bool>();
+    for (f in Reflect.fields(meta))
+      ret[f] = Reflect.hasField(Reflect.field(meta, f), name);
+    return ret;
+  }
 
   static function updateStatics(c:Dynamic, ?old:Dynamic) {
     var isOld = getStatics(old).exists;
@@ -45,6 +52,37 @@ class Runtime {
     for (f in getStatics(c).keys())
       if (isOld(f))
         Reflect.setField(c, f, Reflect.field(old, f));
+  }
+
+  static function bootProto(c:Dynamic, ?old:Dynamic) {
+    var proto:Dict<Dynamic> = c.prototype,
+        closures = meta(haxe.rtti.Meta.getFields(c), 'hotreload.closure');
+
+    function forward(name)
+      return function () {
+        return proto[name].apply(__js('this'), __js('arguments'));
+      }
+
+    for (k in closures.keys()) {
+      var alias = 'hotreload.$k';
+      proto[alias] = proto[k];
+      proto[k] = forward(alias);
+    }
+
+    if (old != null) {
+      var oldProto:Dict<Dynamic> = old.prototype;
+      for (k => v in oldProto)
+        if (Reflect.isFunction(v))
+          switch proto[k] {
+            case null:
+            case Reflect.isFunction(_) => true:
+              oldProto[k] = forward(k);
+            default:
+          }
+        else {
+          // TODO: should anything happen here?
+        }
+    }
   }
 
   static function getClasses(node:Node) {
@@ -67,8 +105,10 @@ class Runtime {
       if (v.onHotswapUnload)
         v.onHotswapUnload(newClasses.exists(k));
 
-    for (n => c in newClasses)
+    for (n => c in newClasses) {
+      bootProto(c, oldClasses[n]);
       updateStatics(c, oldClasses[n]);
+    }
 
     for (n => c in newClasses)
       bootClass(c, oldClasses[n]);
