@@ -33,11 +33,11 @@ class Runtime {
     static function get_root():Root
       return __js('hx');
 
-  static function bootClass(c:Dynamic, ?old:Dynamic)
+  static function bootClass(c:Cls, ?old:Cls)
     if (c.onHotswapLoad != null)
       c.onHotswapLoad(old == null);
 
-  static function getStatics(c:Dynamic)
+  static function getStatics(c:Cls)
     return meta(if (c == null) {} else haxe.rtti.Meta.getStatics(c), 'hotreload.persist');
 
   static function meta(meta:Dynamic<Dynamic<Array<Dynamic>>>, name) {
@@ -47,7 +47,7 @@ class Runtime {
     return ret;
   }
 
-  static function updateStatics(c:Dynamic, ?old:Dynamic) {
+  static function updateStatics(c:Cls, ?old:Cls) {
     var isOld = getStatics(old).exists;
 
     for (f in getStatics(c).keys())
@@ -55,29 +55,24 @@ class Runtime {
         Reflect.setField(c, f, Reflect.field(old, f));
   }
 
-  static function bootProto(name:String, c:Dynamic, ?old:Dynamic) {
-    var proto:Dict<Dynamic> = c.prototype;
+  static function bootProto(name:String, c:Cls, ?old:Cls) {
+    var proto = c.prototype;
     var closures = (untyped hotswapmeta.closures[name] || [] : Array<String>);
-
-    function forward(name)
-      return function () {
-        return proto[name].apply(__js('this'), __js('arguments'));
-      }
 
     for (k in closures) {
       var alias = 'hotreload.$k';
       proto[alias] = proto[k];
-      proto[k] = forward(alias);
+      proto[k] = proto.forward(alias);
     }
 
     if (old != null) {
-      var oldProto:Dict<Dynamic> = old.prototype;
+      var oldProto = old.prototype;
       for (k => v in oldProto)
         if (Reflect.isFunction(v))
           switch proto[k] {
             case null:
             case Reflect.isFunction(_) => true:
-              oldProto[k] = forward(k);
+              oldProto[k] = proto.forward(k);
             default:
           }
         else {
@@ -108,5 +103,22 @@ private typedef Root = haxe.DynamicAccess<Cls>;
 
 @:forward
 private abstract Cls(Dynamic) {
+  public var prototype(get, never):Proto;
+    inline function get_prototype():Proto
+      return this.prototype;
+}
+
+@:forward
+private abstract Proto(haxe.DynamicAccess<Dynamic>) {
+  public function forward(name)
+    return function () {
+      return this[name].apply(__js('this'), __js('arguments'));
+    }
+
+  @:op([]) public inline function get(name)
+    return this.get(name);
+
+  @:op([]) public inline function set(name, value)
+    return this.set(name, value);
 
 }
