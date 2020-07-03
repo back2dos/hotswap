@@ -5,7 +5,7 @@ import js.node.Fs.*;
 
 class RunTests {
   static var counter = 0;
-  static var r = null;
+  static var r = new foo.Inst().method;
   static function main() {
     var file = js.Node.__filename;
     watch(file, (a, b) -> {
@@ -17,8 +17,6 @@ class RunTests {
   }
 
   static function onHotswapLoad(isNew:Bool) {
-    if (r == null)
-      r = new foo.Inst().method;
     trace('loaded ($isNew) - $counter!');
     r();
   }
