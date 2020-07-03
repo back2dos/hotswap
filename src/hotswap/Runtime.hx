@@ -9,7 +9,7 @@ class Runtime {
 
   static public function patch(source:String) {
     if (source == null || source == '' || source == last) return;
-    var old = getRoot();
+    var old = root;
     __js('var hxPatch = null');
     js.Lib.eval(source);
     __js('hx = hxPatch');
@@ -25,19 +25,13 @@ class Runtime {
   }
 
   static function boot() {
-    for (n => c in root) bootProto(c);
+    for (n => c in root) bootProto(n, c);
     for (n => c in root) bootClass(c);
   }
 
-  static var root(get, null):Root;
-    static function get_root()
-      return switch root {
-        case null: root = getRoot();
-        case v: v;
-      }
-
-  static function getRoot():Root
-    return __js('hx');
+  static var root(get, never):Root;
+    static function get_root():Root
+      return __js('hx');
 
   static function bootClass(c:Dynamic, ?old:Dynamic)
     if (c.onHotswapLoad != null)
@@ -61,16 +55,16 @@ class Runtime {
         Reflect.setField(c, f, Reflect.field(old, f));
   }
 
-  static function bootProto(c:Dynamic, ?old:Dynamic) {
-    var proto:Dict<Dynamic> = c.prototype,
-        closures = meta(haxe.rtti.Meta.getFields(c), 'hotreload.closure');
+  static function bootProto(name:String, c:Dynamic, ?old:Dynamic) {
+    var proto:Dict<Dynamic> = c.prototype;
+    var closures = (untyped hotswapmeta.closures[name] || [] : Array<String>);
 
     function forward(name)
       return function () {
         return proto[name].apply(__js('this'), __js('arguments'));
       }
 
-    for (k in closures.keys()) {
+    for (k in closures) {
       var alias = 'hotreload.$k';
       proto[alias] = proto[k];
       proto[k] = forward(alias);
@@ -101,7 +95,7 @@ class Runtime {
         v.onHotswapUnload(newRoot.exists(k));
 
     for (n => c in newRoot) {
-      bootProto(c, oldRoot[n]);
+      bootProto(n, c, oldRoot[n]);
       updateStatics(c, oldRoot[n]);
     }
 

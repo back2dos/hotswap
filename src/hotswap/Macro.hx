@@ -5,15 +5,17 @@ import haxe.macro.Compiler;
 import haxe.macro.Context.*;
 import haxe.macro.Expr;
 import haxe.macro.Type;
+import haxe.ds.Option;
 
 using haxe.macro.Tools;
 using tink.MacroApi;
 using StringTools;
+using sys.io.File;
 
 class Macro {
 
   static final PERSIST = 'hotreload.persist';
-  static final CLOSURE = 'hotreload.closure';
+  static final CLOSURE = ':hotreload.closure';
 
   static function base<T:BaseType>(r:Ref<T>):BaseType
     return r.get();
@@ -65,13 +67,18 @@ class Macro {
   }
 
   static function move(t:BaseType)
-    if (!t.isExtern) {
-      t.meta.remove(':native');
+    return
+      if (!t.isExtern) {
+        t.meta.remove(':native');
 
-      var id = macro $v{getId(t)};
+        var id = getId(t);
+        var e = macro $v{id};
 
-      t.meta.add(':native', [id], id.pos);
-    }
+        t.meta.add(':native', [e], e.pos);
+
+        Some(id);
+      }
+      else None;
 
   static function getId(t:BaseType)
     return 'hx.' + t.pack.concat([t.name]).join('$');
@@ -89,13 +96,14 @@ class Macro {
 
     Compiler.addGlobalMetadata('Type', '@:build(hotswap.Macro.processType())');
 
+    var closures = new haxe.DynamicAccess();
+
     onGenerate(types -> {
       for (t in types)
         switch t {
           case TEnum(_.get() => e, _): move(e);
-          case TInst(_.get() => c, _):
+          case TInst(_.get() => c = move(_) => Some(id), _):
 
-            move(c);
             var statics = c.statics.get();
             for (f in c.statics.get())
               switch f.kind {
@@ -110,8 +118,19 @@ class Macro {
                 function seek(t:TypedExpr) if (t != null) {
                   t.iter(seek);
                   switch t {
-                    case { expr: TField(_, FClosure(_, _.get() => cf))} if (!cf.meta.has(CLOSURE)):
+                    case { expr: TField(_, FClosure(target, _.get() => cf))} if (!cf.meta.has(CLOSURE)):
                       cf.meta.add(CLOSURE, [], (macro null).pos);
+
+                      switch target {
+                        case null:
+                          t.pos.warning('method closures on anonymous objects are not supported yet');
+                        case getId(target.c.get()).substr(3) => id:
+                          (switch closures[id] {
+                            case null: closures[id] = [];
+                            case v: v;
+                          }).push(cf.name);
+                      }
+
                     default:
                   }
                 }
@@ -120,6 +139,9 @@ class Macro {
 
           default:
         }
+      var out = Compiler.getOutput() + '.hotswapmeta';
+      out.saveContent('var hotswapmeta = { closures: ${haxe.Json.stringify(closures)}}');
+      Compiler.includeFile(out, Closure);
     });
   }
 }
