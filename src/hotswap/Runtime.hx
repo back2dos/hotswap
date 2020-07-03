@@ -25,11 +25,18 @@ class Runtime {
   }
 
   static function boot() {
-    getRoot().crawl(c -> bootProto(c));
-    getRoot().crawl(c -> bootClass(c));
+    for (n => c in root) bootProto(c);
+    for (n => c in root) bootClass(c);
   }
 
-  static function getRoot():Node
+  static var root(get, null):Root;
+    static function get_root()
+      return switch root {
+        case null: root = getRoot();
+        case v: v;
+      }
+
+  static function getRoot():Root
     return __js('hx');
 
   static function bootClass(c:Dynamic, ?old:Dynamic)
@@ -85,62 +92,27 @@ class Runtime {
     }
   }
 
-  static function getClasses(node:Node) {
-    var ret = new Dict<Dynamic>();
+  static function doPatch(oldRoot:Root) {
 
-    node.crawl(c -> switch Type.getClassName(c) {
-      case null:
-      case name: ret[name] = c;
-    });
+    var newRoot = root;
 
-    return ret;
-  }
-
-  static function doPatch(oldRoot:Node) {
-
-    var oldClasses = getClasses(oldRoot),
-        newClasses = getClasses(getRoot());
-
-    for (k => v in oldClasses)
+    for (k => v in oldRoot)
       if (v.onHotswapUnload)
-        v.onHotswapUnload(newClasses.exists(k));
+        v.onHotswapUnload(newRoot.exists(k));
 
-    for (n => c in newClasses) {
-      bootProto(c, oldClasses[n]);
-      updateStatics(c, oldClasses[n]);
+    for (n => c in newRoot) {
+      bootProto(c, oldRoot[n]);
+      updateStatics(c, oldRoot[n]);
     }
 
-    for (n => c in newClasses)
-      bootClass(c, oldClasses[n]);
+    for (n => c in newRoot)
+      bootClass(c, oldRoot[n]);
   }
 }
 
-private abstract Node(Dynamic) from Package {
+private typedef Root = haxe.DynamicAccess<Cls>;
 
-  public var kind(get, never):NodeKind;
-    function get_kind()
-      return
-        if (isClass) Cls(this);
-        else Pack(this);
+@:forward
+private abstract Cls(Dynamic) {
 
-  public var isClass(get, never):Bool;
-    inline function get_isClass()
-      return !!this.__name__;
-
-  public function keyValueIterator():KeyValueIterator<String, Node>
-    return if (this.__name__ || this.__ename__) EMPTY else (this:Package).keyValueIterator();
-
-  public function crawl(handleClass:Dynamic->Void)
-    for (name => node in keyValueIterator())
-      if (node.isClass) handleClass(node)
-      else node.crawl(handleClass);
-
-  static final EMPTY = [].iterator();
 }
-
-private enum NodeKind {
-  Cls(c:Dynamic);
-  Pack(p:Package);
-}
-
-private typedef Package = Dict<Node>;
