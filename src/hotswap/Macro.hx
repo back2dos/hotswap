@@ -6,6 +6,7 @@ import haxe.macro.Context.*;
 import haxe.macro.Expr;
 import haxe.macro.Type;
 import haxe.ds.Option;
+import haxe.DynamicAccess as Dict;
 
 using haxe.macro.Tools;
 using tink.MacroApi;
@@ -81,7 +82,7 @@ class Macro {
         t.meta.remove(':native');
 
         var id = getId(t);
-        var e = macro $v{id};
+        var e = macro $v{'hx.' + id};
 
         t.meta.add(':native', [e], e.pos);
 
@@ -90,7 +91,7 @@ class Macro {
       else None;
 
   static function getId(t:BaseType)
-    return 'hx.' + t.pack.concat([t.name]).join('$');
+    return t.pack.concat([t.name]).join('$');
 
   static function keep(o:{ meta:MetaAccess })
     if (!o.meta.has(':keep'))
@@ -105,13 +106,18 @@ class Macro {
 
     Compiler.addGlobalMetadata('Type', '@:build(hotswap.Macro.processType())');
 
-    var closures = new haxe.DynamicAccess();
-
     onGenerate(types -> {
+      var closures = new Dict(),
+          anonClosures = new Dict(),
+          interfaceClosures = new Dict(),
+          classes = [];
+
       for (t in types)
         switch t {
           case TEnum(_.get() => e, _): move(e);
           case TInst(_.get() => c = move(_) => Some(id), _):
+            if (!c.isInterface)
+              classes.push(c);
 
             var statics = c.statics.get();
             for (f in c.statics.get())
@@ -132,10 +138,11 @@ class Macro {
 
                       switch target {
                         case null:
-                          t.pos.warning('method closures on anonymous objects are not supported yet');
-                        case getId(target.c.get()).substr(3) => id:
-                          (switch closures[id] {
-                            case null: closures[id] = [];
+                          anonClosures[cf.name] = true;
+                        case _.c.get() => c = getId(_) => id:
+                          var m = if (c.isInterface) interfaceClosures else closures;
+                          (switch m[id] {
+                            case null: m[id] = [];
                             case v: v;
                           }).push(cf.name);
                       }
@@ -148,6 +155,38 @@ class Macro {
 
           default:
         }
+
+      for (c in classes) {
+        var id = getId(c);
+
+        function add(name) {
+          var cl = switch closures[id] {
+            case null: closures[id] = [];
+            case v: v;
+          }
+          if (cl.indexOf(name) == -1)
+            cl.push(name);
+        }
+
+        function interf(i:ClassType) {
+          switch interfaceClosures[getId(i)] {
+            case null:
+            case fields:
+              for (f in fields)
+                add(f);
+          }
+          for (i in i.interfaces)
+            interf(i.t.get());
+        }
+
+        for (f in c.fields.get())
+          if (anonClosures[f.name])
+            if (f.kind.match(FMethod(_))) add(f.name);
+
+        for (i in c.interfaces)
+          interf(i.t.get());
+      }
+
       var out = Compiler.getOutput() + '.hotswapmeta';
       out.saveContent('var hotswapmeta = { closures: ${haxe.Json.stringify(closures)}}');
       Compiler.includeFile(out, Closure);
