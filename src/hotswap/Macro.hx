@@ -68,7 +68,7 @@ class Macro {
 
   static function move(t:BaseType)
     return
-      if (!t.isExtern) {
+      if (!t.isExtern && t.module != 'haxe.Exception') {//TODO: this needs to be solved properly
         t.meta.remove(':native');
 
         var id = getId(t);
