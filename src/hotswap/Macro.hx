@@ -75,18 +75,18 @@ class Macro {
                   if (f.name.startsWith('onHotswap')) keep(f);
               }
 
-            for (fields in [statics, c.fields.get()])
-              for (f in fields) {
-                function seek(t:TypedExpr) if (t != null) {
-                  t.iter(seek);
-                  switch t {
-                    case { expr: TField(_, FClosure(_, _.get() => cf))} if (!cf.meta.has(CLOSURE)):
-                      cf.meta.add(CLOSURE, [], (macro null).pos);
-                    default:
-                  }
-                }
-                seek(f.expr());
-              }
+            // for (fields in [statics, c.fields.get()])
+            //   for (f in fields) {
+            //     function seek(t:TypedExpr) if (t != null) {
+            //       t.iter(seek);
+            //       switch t {
+            //         case { expr: TField(_, FClosure(_, _.get() => cf))} if (!cf.meta.has(CLOSURE)):
+            //           cf.meta.add(CLOSURE, [], (macro null).pos);
+            //         default:
+            //       }
+            //     }
+            //     seek(f.expr());
+            //   }
 
           default:
         }

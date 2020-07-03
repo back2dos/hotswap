@@ -12,13 +12,13 @@ class Runtime {
     var old = getRoot();
     __js('var hxPatch = null');
     js.Lib.eval(source);
+    __js('hx = hxPatch');
     doPatch(old);
     last = source;
   }
 
   static public final FIRST_LOAD = {
     var isFirst:Bool = __js('typeof hxPatch === "undefined"');
-    trace('load: $isFirst');
     if (!isFirst)
       __js('hxPatch = hx');
     isFirst;
