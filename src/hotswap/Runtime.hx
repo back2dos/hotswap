@@ -26,8 +26,19 @@ class Runtime {
     isFirst;
   }
 
-  static function __init__()
-    for (n => c in root) wrapClosures(n, c);
+  static function __init__() {
+    var meta:Dict<Array<String>> = untyped hotswapmeta.closures;
+    for (n => closures in meta) {
+      var proto = root[n].prototype;
+
+      for (k in closures) {
+        var alias = 'hotreload.$k';
+        proto[alias] = proto[k];
+        proto[k] = proto.forward(alias);
+      }
+
+    }
+  }
 
   static function boot()
     for (n => c in root) bootClass(c);
@@ -56,17 +67,6 @@ class Runtime {
     for (f in getStatics(c).keys())
       if (isOld(f))
         Reflect.setField(c, f, Reflect.field(old, f));
-  }
-
-  static function wrapClosures(name:String, c:Cls) {
-    var proto = c.prototype;
-    var closures = (untyped hotswapmeta.closures[name] || [] : Array<String>);
-
-    for (k in closures) {
-      var alias = 'hotreload.$k';
-      proto[alias] = proto[k];
-      proto[k] = proto.forward(alias);
-    }
   }
 
   static function rewireProto(c:Cls, ?old:Cls) {
