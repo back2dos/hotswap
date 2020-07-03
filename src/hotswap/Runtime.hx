@@ -18,6 +18,28 @@ class Runtime {
     last = source;
   }
 
+  #if nodejs
+
+  #else
+  static public function permaPoll() {
+    var url = (cast js.Browser.document.currentScript:js.html.ScriptElement).src;
+    function poll() {
+      var url = url + '?time=${Date.now().getTime()}';
+      var h = new haxe.Http(url);
+      h.onError = function (e) {
+        js.Browser.console.error('Failed to load $url', e);
+        haxe.Timer.delay(poll, 250);
+      }
+      h.onData = function (s) {
+        patch(s);
+        haxe.Timer.delay(poll, 250);
+      }
+      h.request();
+    }
+    poll();
+  }
+  #end
+
   static public final FIRST_LOAD = {
     var isFirst:Bool = __js('typeof hxPatch === "undefined"');
     if (!isFirst)
@@ -32,11 +54,11 @@ class Runtime {
       case null:
       case c:
         var proto = c.prototype;
-      for (k in closures) {
-        var alias = 'hotreload.$k';
-        proto[alias] = proto[k];
-        proto[k] = proto.forward(alias);
-      }
+        for (k in closures) {
+          var alias = 'hotreload.$k';
+          proto[alias] = proto[k];
+          proto[k] = proto.forward(alias);
+        }
     }
   }
 
