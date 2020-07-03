@@ -3,6 +3,7 @@ package hotswap;
 import haxe.ds.Option;
 import haxe.DynamicAccess as Dict;
 import js.Syntax.code as __js;
+import js.Lib.*;
 
 class Runtime {
   static var last = '';
@@ -11,7 +12,7 @@ class Runtime {
     if (source == null || source == '' || source == last) return;
     var old = root;
     __js('var hxPatch = null');
-    js.Lib.eval(source);
+    eval(source);
     __js('hx = hxPatch');
     doPatch(old);
     last = source;
@@ -21,13 +22,15 @@ class Runtime {
     var isFirst:Bool = __js('typeof hxPatch === "undefined"');
     if (!isFirst)
       __js('hxPatch = hx');
+
     isFirst;
   }
 
-  static function boot() {
-    for (n => c in root) bootProto(n, c);
+  static function __init__()
+    for (n => c in root) wrapClosures(n, c);
+
+  static function boot()
     for (n => c in root) bootClass(c);
-  }
 
   static var root(get, never):Root;
     static function get_root():Root
@@ -55,7 +58,7 @@ class Runtime {
         Reflect.setField(c, f, Reflect.field(old, f));
   }
 
-  static function bootProto(name:String, c:Cls, ?old:Cls) {
+  static function wrapClosures(name:String, c:Cls) {
     var proto = c.prototype;
     var closures = (untyped hotswapmeta.closures[name] || [] : Array<String>);
 
@@ -64,6 +67,10 @@ class Runtime {
       proto[alias] = proto[k];
       proto[k] = proto.forward(alias);
     }
+  }
+
+  static function rewireProto(c:Cls, ?old:Cls) {
+    var proto = c.prototype;
 
     if (old != null) {
       var oldProto = old.prototype;
@@ -90,7 +97,7 @@ class Runtime {
         v.onHotswapUnload(newRoot.exists(k));
 
     for (n => c in newRoot) {
-      bootProto(n, c, oldRoot[n]);
+      rewireProto(c, oldRoot[n]);
       updateStatics(c, oldRoot[n]);
     }
 
@@ -112,7 +119,7 @@ private abstract Cls(Dynamic) {
 private abstract Proto(haxe.DynamicAccess<Dynamic>) {
   public function forward(name)
     return function () {
-      return this[name].apply(__js('this'), __js('arguments'));
+      return this[name].apply(nativeThis, __js('arguments'));
     }
 
   @:op([]) public inline function get(name)
