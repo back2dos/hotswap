@@ -6,16 +6,15 @@ import js.node.Fs.*;
 class RunTests {
   static var counter = 0;
   static var r = null;
-  static function main()
-    if (Runtime.FIRST_LOAD) {
-      var file = js.Node.__filename;
-      watch(file, (a, b) -> {
-        trace('change #${counter++} triggered');
+  static function main() {
+    var file = js.Node.__filename;
+    watch(file, (a, b) -> {
+      trace('change #${counter++} triggered');
 
-        try Runtime.patch(readFileSync(file).toString())
-        catch (e:Dynamic) {}
-      });
-    }
+      try Runtime.patch(readFileSync(file).toString())
+      catch (e:Dynamic) {}
+    });
+  }
 
   static function onHotswapLoad(isNew:Bool) {
     if (r == null)
