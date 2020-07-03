@@ -28,15 +28,15 @@ class Runtime {
 
   static function __init__() {
     var meta:Dict<Array<String>> = untyped hotswapmeta.closures;
-    for (n => closures in meta) {
-      var proto = root[n].prototype;
-
+    for (n => closures in meta) switch root[n] {
+      case null:
+      case c:
+        var proto = c.prototype;
       for (k in closures) {
         var alias = 'hotreload.$k';
         proto[alias] = proto[k];
         proto[k] = proto.forward(alias);
       }
-
     }
   }
 
