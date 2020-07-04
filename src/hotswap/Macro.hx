@@ -35,15 +35,22 @@ class Macro {
       switch f.name {
         case 'getClassName'
            | 'getEnumName':
-          modifyBody(e -> switch e {
-            case macro return $e, macro { return $e; }:
-              macro @:pos(e.pos) return $e.substr(3).split('$').join('.');
-            default:
-              e.reject('Function body does not look as expected by hotswap. Please raise an issue.');
+          modifyBody(e -> macro @:pos(e.pos) {
+            var ret:String = (function () $e)();
+            return
+              if (ret.substr(0, 3) == 'hx.') ret.substr(3).split('$').join('.');
+              else ret;
           });
         case 'resolveClass'
            | 'resolveEnum':
-          modifyBody(e -> macro @:pos(e.pos) { name = 'hx.' + name.split('.').join('$'); ${e}});
+          modifyBody(e -> macro @:pos(e.pos) {
+            var ret = (function () $e)();
+            if (ret == null) {
+              name = 'hx.' + name.split('.').join('$');
+              $e;
+            }
+            return ret;
+          });
         default:
       }
     }
