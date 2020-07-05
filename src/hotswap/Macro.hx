@@ -199,5 +199,39 @@ class Macro {
       Compiler.includeFile(out, Closure);
     });
   }
+
+  static function process()
+    return ClassBuilder.run([lazify]);
+
+  static public function lazify(fields:ClassBuilder) {
+    for (f in fields) if (!f.isStatic)
+      switch f.getVar() {
+        case Success({ expr: null | macro null } | { get: 'get' }):
+        case Success({ type: t, expr: e, get: get, set: set }):
+
+          switch f.metaNamed(':isVar') {
+            case []:
+            default: f.addMeta(':isVar');
+          }
+
+          var getter = 'get_${f.name}';
+
+          function write() {
+            var fieldAccess = storeTypedExpr(typeExpr(macro $i{f.name}));
+            return macro $fieldAccess = $e;
+          }
+
+          fields.addMembers(macro class {
+            function $getter():$t
+              return switch $i{f.name} {
+                case null: ${write.bounce()}
+                case v: v;
+              }
+          });
+
+          f.kind = FProp('get', set, t, macro null);// TODO: consider generating native properties instead
+        default:
+      }
+  }
 }
 #end
