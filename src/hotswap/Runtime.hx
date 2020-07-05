@@ -13,6 +13,7 @@ class Runtime {
     var old = root;
     __js('var hxPatch = null');
     eval(source);
+    unload(__js('hxPatch'));
     __js('hx = hxPatch');
     doPatch(old);
     last = source;
@@ -110,13 +111,14 @@ class Runtime {
     }
   }
 
-  static function doPatch(oldRoot:Root) {
-
-    var newRoot = root;
-
+  static function unload(newRoot:Root)
     for (k => v in oldRoot)
       if (v.onHotswapUnload)
         v.onHotswapUnload(newRoot.exists(k));
+
+  static function doPatch(oldRoot:Root) {
+
+    var newRoot = root;
 
     for (n => c in newRoot) {
       rewireProto(c, oldRoot[n]);
