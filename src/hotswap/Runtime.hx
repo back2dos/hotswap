@@ -125,7 +125,7 @@ class Runtime {
     if (old != null) {
       var proto = c.prototype,
           oldProto = old.prototype;
-      setPrototypeOf(cast oldProto, getPrototypeOf(cast proto));
+      setPrototypeOf(cast oldProto, cast proto);//TODO: this can create pretty impressive chains
     }
 
   static function unload(newRoot:Root)
