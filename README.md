@@ -49,7 +49,17 @@ When your code executes for the first time, `hotswap` does a few things:
 
 ### Reload
 
-New code is loaded via `hotswap.Runtime.patch`, which does a whole number of things. Note that the `main` entry point of the new code is *not* called.
+The relevant entrypoint for reloading is the following:
+
+```haxe
+package hotswap;
+
+class Runtime {
+  static public function createPatch(source:String):Outcome<{ function apply():Bool; }, Dynamic>;
+}
+```
+
+If parsing the source fails, you get a corresponding `Failure`, otherwise you get a patch, which you can `apply` to swap in the new code (returning `false` if you're trying to apply the same patch twice). Patching does a whole number of things. Note that the `main` entry point of the new code is *not* called. On nodejs, the current file is automatically watched and reloaded.
 
 1. the code is `eval`ed (unless it's the same as the last value passed to `hotswap.Runtime.patch`), in a context where a `var hxPatch = null` is available and assigns the value of its `hx` "namespace" is assigned to `hxPatch`.
 

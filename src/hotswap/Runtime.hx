@@ -18,19 +18,45 @@ class Runtime {
 
   static var last = '';
 
-  static public function patch(source:String) {
-    if (source == null || source == '' || source == last) return;
-    var old = root;
-    __js('var hxPatch = null');
-    eval(source);
-    unload(__js('hxPatch'));
-    __js('hx = hxPatch');
-    doPatch(old);
-    last = source;
-    _reloaded.trigger({ revision: ++revision });
-  }
+  static public function createPatch(source:String):Outcome<{ function apply():Bool; }, Dynamic>
+    try {
+      var raw:Void->Root = eval('(function () {
+        var hxPatch = null;
+        $source;
+        return hxPatch;
+      })');
+      return Success({
+        apply: function () {
+          if (source == null || source == '' || source == last) return false;
+          var nu = raw(),
+              old = root;
+          unload(nu);
+          __js('hx = {0}', nu);
+          doPatch(old);
+          last = source;
+          _reloaded.trigger({ revision: ++revision });
+          return true;
+        }
+      });
+    }
+    catch (e:Dynamic)
+      return Failure(e);
 
   #if nodejs
+  static function watchSelf() {
+    var file = js.Node.__filename;
+    js.node.Fs.watch(file, (_, _) -> {
+      var source =
+        try js.node.Fs.readFileSync(file).toString()
+        catch (e:Dynamic) null;
+
+      if (source != null)
+        switch createPatch(source) {
+          case Success(p): p.apply();
+          case Failure(e): js.Browser.console.error(e);
+        }
+    });
+  }
 
   #else
   static public function permaPoll() {
@@ -58,7 +84,7 @@ class Runtime {
       __js('hxPatch = hx');
     else {
       #if nodejs
-
+        watchSelf();
       #end
     }
 
