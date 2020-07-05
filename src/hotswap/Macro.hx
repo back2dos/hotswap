@@ -130,7 +130,8 @@ class Macro {
             for (f in c.statics.get())
               switch f.kind {
                 case FVar(_, AccNormal) | FMethod(MethDynamic):
-                  f.meta.add(PERSIST, [], (macro null).pos);
+                  if (!f.meta.has(PERSIST))
+                    f.meta.add(PERSIST, [], (macro null).pos);
                 default:
                   if (f.name.startsWith('onHotswap')) keep(f);
               }
