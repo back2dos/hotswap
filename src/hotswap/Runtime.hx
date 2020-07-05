@@ -25,8 +25,8 @@ class Runtime {
     eval(source);
     unload(__js('hxPatch'));
     __js('hx = hxPatch');
-    last = source;
     doPatch(old);
+    last = source;
     _reloaded.trigger({ revision: ++revision });
   }
 
