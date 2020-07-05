@@ -3,6 +3,7 @@ package hotswap;
 import haxe.ds.Option;
 import haxe.DynamicAccess as Dict;
 import js.Syntax.code as __js;
+import js.lib.Object.*;
 import js.Lib.*;
 
 class Runtime {
@@ -61,6 +62,15 @@ class Runtime {
           proto[k] = proto.forward(alias);
         }
     }
+    for (n => c in root) {
+      var wrapper = new Proto();
+      switch c.prototype {
+        case null:
+        case v:
+          setPrototypeOf(cast wrapper, cast v);
+      }
+      c.prototype = wrapper;
+    }
   }
 
   static function boot()
@@ -96,58 +106,50 @@ class Runtime {
           Reflect.setField(c, f, Reflect.field(old, f));
     }
 
-  static function rewireProto(c:Cls, ?old:Cls) {
-    var proto = c.prototype;
-
+  static function rewireProto(c:Cls, ?old:Cls)
     if (old != null) {
-      var oldProto = old.prototype;
-      for (k => v in oldProto)
-        if (Reflect.isFunction(v))
-          switch proto[k] {
-            case null:
-            case Reflect.isFunction(_) => true:
-              oldProto[k] = proto.forward(k);
-            default:
-          }
-        else {
-          // TODO: should anything happen here?
-        }
+      var proto = c.prototype,
+          oldProto = old.prototype;
+      setPrototypeOf(cast oldProto, getPrototypeOf(cast proto));
     }
-  }
 
   static function unload(newRoot:Root)
-    for (k => v in oldRoot)
+    for (k => v in root)
       if (v.onHotswapUnload)
         v.onHotswapUnload(newRoot.exists(k));
 
   static function doPatch(oldRoot:Root) {
 
-    var newRoot = root;
-
-    for (n => c in newRoot) {
+    for (n => c in root) {
       rewireProto(c, oldRoot[n]);
       updateStatics(c, oldRoot[n]);
     }
 
-    for (n => c in newRoot)
+    for (n => c in root)
       bootClass(c, oldRoot[n]);
   }
 }
 
-private typedef Root = haxe.DynamicAccess<Cls>;
+private typedef Root = Dict<Cls>;
 
 @:forward
 private abstract Cls(Dynamic) {
-  public var prototype(get, never):Proto;
+  public var prototype(get, set):Proto;
     inline function get_prototype():Proto
       return this.prototype;
+
+    inline function set_prototype(proto:Proto):Proto
+      return this.prototype = proto;
 }
 
 @:forward
-private abstract Proto(haxe.DynamicAccess<Dynamic>) {
+private abstract Proto(Dict<Dynamic>) {
+  public inline function new()
+    this = new Dict();
+
   public function forward(name)
     return function () {
-      return this[name].apply(nativeThis, __js('arguments'));
+      return (nativeThis:Dict<Dynamic>)[name].apply(nativeThis, __js('arguments'));
     }
 
   @:op([]) public inline function get(name)
