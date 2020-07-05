@@ -69,7 +69,10 @@ class Runtime {
         haxe.Timer.delay(poll, 250);
       }
       h.onData = function (s) {
-        patch(s);
+        switch createPatch(s) {
+          case Failure(e): js.Browser.console.error(e);
+          case Success(p): p.apply();
+        }
         haxe.Timer.delay(poll, 250);
       }
       h.request();
