@@ -123,9 +123,16 @@ class Runtime {
 
   static function rewireProto(c:Cls, ?old:Cls)
     if (old != null) {
-      var proto = c.prototype,
-          oldProto = old.prototype;
-      setPrototypeOf(cast oldProto, cast proto);//TODO: this can create pretty impressive chains
+      var protos = [old.prototype];
+      switch old.hotreloadProtoHistory {
+        case null:
+        case v: protos = protos.concat(v);
+      }
+      c.hotreloadProtoHistory = protos;
+
+      var proto = c.prototype;
+      for (oldProto in protos)
+        setPrototypeOf(cast oldProto, getPrototypeOf(cast proto));
     }
 
   static function unload(newRoot:Root)
