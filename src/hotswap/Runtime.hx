@@ -6,7 +6,16 @@ import js.Syntax.code as __js;
 import js.lib.Object.*;
 import js.Lib.*;
 
+using tink.CoreApi;
+
 class Runtime {
+
+  static var _reloaded = new SignalTrigger();
+  static var revision = 0;
+  static public var reloaded(get, never):Signal<{ final revision:Int; }>;
+    static function get_reloaded()
+      return _reloaded;
+
   static var last = '';
 
   static public function patch(source:String) {
@@ -16,8 +25,9 @@ class Runtime {
     eval(source);
     unload(__js('hxPatch'));
     __js('hx = hxPatch');
-    doPatch(old);
     last = source;
+    doPatch(old);
+    _reloaded.trigger({ revision: ++revision });
   }
 
   #if nodejs
@@ -46,6 +56,11 @@ class Runtime {
     var isFirst:Bool = __js('typeof hxPatch === "undefined"');
     if (!isFirst)
       __js('hxPatch = hx');
+    else {
+      #if nodejs
+
+      #end
+    }
 
     isFirst;
   }
