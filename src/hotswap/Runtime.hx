@@ -75,22 +75,26 @@ class Runtime {
       c.onHotswapLoad(old == null);
 
   static function getStatics(c:Cls)
-    return meta(if (c == null) {} else haxe.rtti.Meta.getStatics(c), 'hotreload.persist');
+    return
+      if (c == null) null;
+      else {
+        var meta = haxe.rtti.Meta.getStatics(c),
+            ret = new Dict<Bool>();
 
-  static function meta(meta:Dynamic<Dynamic<Array<Dynamic>>>, name) {
-    var ret = new Dict<Bool>();
-    for (f in Reflect.fields(meta))
-      ret[f] = Reflect.hasField(Reflect.field(meta, f), name);
-    return ret;
-  }
+        for (f in Reflect.fields(meta))
+          ret[f] = Reflect.hasField(Reflect.field(meta, f), 'hotreload.persist');
 
-  static function updateStatics(c:Cls, ?old:Cls) {
-    var isOld = getStatics(old).exists;
+        ret;
+      }
 
-    for (f in getStatics(c).keys())
-      if (isOld(f))
-        Reflect.setField(c, f, Reflect.field(old, f));
-  }
+  static function updateStatics(c:Cls, ?old:Cls)
+    if (old != null) {
+      var isOld = getStatics(old).exists;
+
+      for (f in getStatics(c).keys())
+        if (isOld(f) && Reflect.hasField(old, f)) // the old field may have been eliminated
+          Reflect.setField(c, f, Reflect.field(old, f));
+    }
 
   static function rewireProto(c:Cls, ?old:Cls) {
     var proto = c.prototype;
