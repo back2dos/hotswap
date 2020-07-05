@@ -156,12 +156,43 @@ The way to avoid this, is to make the initialization of `clicks` lazy:
 
 ```haxe
 class Foo {
-  var clicks(get, null);
+  var clicks(get, null):Array<MouseEvent>;
   function get_clicks()
     return if (clicks == null) clicks = [] else clicks;
+  // ...
 ```
 
-There's potential for solving this implicitly via macros.
+There's potential for solving this implicitly via macros. Using `@:build(hotswap.Macro.process())` will move initialization into such lazy getters.
+
+#### Changing field types
+
+```haxe
+// Before
+class Foo {
+  var clicks(get, null):Array<MouseEvent>;
+  function get_clicks()
+    return if (clicks == null) clicks = [] else clicks;
+  public function new() {
+    document.addEventListener('click', handleClick);
+  }
+  function handleClick(event) {
+    trace('click number ${clicks.push(even)}');
+  }
+}
+// After
+class Foo {
+  var clicks:Int;
+  function get_clicks()
+    return if (clicks == null) clicks = 0 else clicks;
+  public function new() {
+    document.addEventListener('click', handleClick);
+  }
+  function handleClick(event)
+    trace('click number ${++clicks}');
+}
+```
+
+This is likely to lead to an array being incremented. Everything is possible in JavaScript, but the results are often undesireable.
 
 #### Static Initialization
 
