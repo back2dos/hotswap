@@ -95,6 +95,11 @@ class Runtime {
   }
 
   static function __init__() {
+    wrapClosures();
+    prototypeIndirection();
+  }
+
+  static function wrapClosures() {
     var meta:Dict<Array<String>> = untyped hotswapmeta.closures;
     for (n => closures in meta) switch root[n] {
       case null:
@@ -106,6 +111,9 @@ class Runtime {
           proto[k] = proto.forward(alias);
         }
     }
+  }
+
+  static function prototypeIndirection() {
     for (n => c in root) {
       var wrapper = new Proto();
       switch c.prototype {
