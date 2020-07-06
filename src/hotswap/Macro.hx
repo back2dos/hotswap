@@ -136,6 +136,11 @@ class Macro {
                   if (f.name.startsWith('onHotswap')) keep(f);
               }
 
+            switch c.constructor {
+              case null:
+              case f: statics.push(f.get());
+            }
+
             for (fields in [statics, c.fields.get()])
               for (f in fields) {
                 function seek(t:TypedExpr) if (t != null) {
